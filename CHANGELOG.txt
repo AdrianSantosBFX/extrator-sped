@@ -1,0 +1,20 @@
+Extrator SPED Fiscal — v0.1.6
+
+NOVO
+- Leitura e vinculacao dos registros C170, C100 e do cadastro 0200.
+- Nova consulta de itens com texto livre, NCM, CFOP, CST e operacao.
+- Novo cadastro de produtos 0200 com pesquisa e contagem de uso no C170.
+- Janela de detalhes C100 agora mostra abas C190 e C170 por documento.
+- Soma informativa de VL_ITEM, ICMS e IPI C170 filtrados, independente do C190.
+- Indicadores de C170 com COD_ITEM nao encontrado no 0200 e C100 sem C170
+  com ressalva de dispensa de registros em certos casos.
+- Exporte as novas tabelas para CSV ou Excel (XLSX) via menu existente;
+  QTD C170 com 5 casas decimais e valores em celulas numericas no XLSX.
+- Nova amostra 100% ficticia e testes de regressao.
+- Melhor distribuiçao dos botões do menu e etiquetas de contexto.
+
+PRESERVADO
+- Interface corporativa, icones MIT e topo e rodape da v0.1.5.
+- Consulta avancada de documentos, C190, CFOP/CST, E110.
+- Relatorios PDF/XLSX consolidados da v0.1.5, sem mistura de bases.
+- Java 8 / JRE, sem instalar dependencias e sem transmissao.

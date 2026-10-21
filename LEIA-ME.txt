@@ -1,0 +1,57 @@
+EXTRATOR SPED FISCAL — v0.1.6
+============================================
+Aplicativo Windows / Java 8. Executa com JRE; o JDK NAO e exigido no PC.
+Software 100% local: nao transmite arquivos e nao modifica o TXT original.
+
+COMO EXECUTAR
+  1. Extraia todo o ZIP em uma pasta do Windows.
+  2. Abra iniciar_extrator.bat (ou java -jar ExtratorSPED-v0.1.6.jar).
+  3. Abra um TXT EFD ICMS/IPI em Abrir SPED.
+  4. Experimente primeiro exemplo_sped_itens_ficticio.txt (100% ficticio).
+  5. Use o menu lateral "Itens - C170" para filtrar por:
+      - Codigo interno do item ou descricao (cadastro 0200 + DESCR_COMPL),
+      - NCM cadastrado no 0200, CFOP, CST e entrada/saida.
+  6. "Produtos - 0200" lista todo o cadastro 0200, inclusive produtos sem C170;
+     filtre por codigo/descricao e NCM.
+  7. Em "Notas - C100", de dois cliques na nota: aparecem duas abas,
+     Analiticos C190 e Itens C170 vinculados ao documento.
+  8. Exporte CSV pelo botao superior ou XLSX pelo menu Exportacao >
+     Exportar XLSX da tabela atual. Respeita filtros e ordenacao da tabela.
+  9. Na aba Relatorios, a consolidacao de XLSX/PDF permanece BASEADA EM C190,
+     separada de C100 e E110; nao inclui totals C170 no mesmo demonstrativo.
+
+CONTROLE DE QUALIDADE
+  - C170: NUM_ITEM, COD_ITEM, descricao 0200, NCM 0200, QTD, UNID, CFOP, CST,
+    VL_ITEM, descontos, bases, ICMS, ICMS-ST, IPI.
+  - Referencia 0200 resolvida pelo COD_ITEM apos a leitura completa.
+  - COD_ITEM nao encontrado no 0200 aparece como indicador/ocorrencia cadastral.
+  - C100 sem C170 recebe contagem INFORMATIVA, nunca diagnostico automatico
+    de omissao. O C170 pode ser dispensado conforme modelo/emissor/COD_SIT.
+  - NCM em branco nao e automaticamente erro; depende de hipotese legal.
+  - Valores declarados em C100/C170/C190/E110 sao bases diferentes:
+    NUNCA some esses totais entre si (duplicacao).
+  - Operacoes canceladas ou especiais podem constar nos registros brutos;
+    consulte COD_SIT antes de avaliar totais.
+  - Somas de itens C170 sao apenas dos ITENS LIDOS (nao toda a NF-e).
+  - Campos monetarios invalidos sao destacados nas ocorrencias e nao
+    somados no respectivo campo; a apuracao fiscal NAO e recalculada.
+  - Nos itens C170, campo vazio aparece como nao informado (—), sem virar
+    zero declarado. QTD em branco pode decorrer de excecoes de 2026.
+  - Nao faz validacao de PVA/SEFAZ nem comparacao com XML ou calculo de impostos.
+  - O antigo exemplo_sped_ficticio.txt demonstra arquivos SEM C170/0200.
+  - Siga as politicas de TI e privacidade de sua empresa antes de utilizar.
+
+REFERENCIA TECNICA
+  Guia Pratico EFD ICMS/IPI 3.2.4, publicado em 10/09/2026,
+  registro 0200 e registro C170, v. norma oficial:
+  https://www.gov.br/sped/pt-br/assuntos/escrituracoes-digitais/efd-icms-ipi/manuais-e-documentos-tecnicos/guia-pratico-efd-versao-3-2-4.pdf
+
+CONTEUDO
+  ExtratorSPED-v0.1.6.jar — Compilado Java 8 (major 52)
+  iniciar_extrator.bat — Execucao no Windows sem JDK
+  exemplo_sped_itens_ficticio.txt — Teste completo de C170 + 0200
+  exemplo_sped_ficticio.txt — Regressao legado (sem itens)
+  src/ — Codigo fonte + testes
+  assets/tabler/ — Icones e licenca MIT
+
+Versao v0.1.6: Funcionalidades de consulta de itens. Nao eh uma validacao fiscal.
