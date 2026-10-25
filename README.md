@@ -2,6 +2,10 @@
 
 Aplicativo desktop em **Java 8 e Swing** para explorar arquivos EFD ICMS/IPI localmente. Permite consultar documentos, produtos e itens e exportar os resultados sem modificar o TXT original.
 
+## Interface
+
+![Tela inicial do Extrator SPED Fiscal pronta para importar uma EFD ICMS/IPI](docs/images/visao-geral.png)
+
 ## Funcionalidades
 
 - Consulta de documentos C100, analíticos C190, itens C170, produtos 0200 e apuração declarada E110.
