@@ -1,20 +1,27 @@
-Extrator SPED Fiscal — v0.1.6
+Extrator SPED Fiscal — v0.1.11 (22/10/2026)
 
-NOVO
-- Leitura e vinculacao dos registros C170, C100 e do cadastro 0200.
-- Nova consulta de itens com texto livre, NCM, CFOP, CST e operacao.
-- Novo cadastro de produtos 0200 com pesquisa e contagem de uso no C170.
-- Janela de detalhes C100 agora mostra abas C190 e C170 por documento.
-- Soma informativa de VL_ITEM, ICMS e IPI C170 filtrados, independente do C190.
-- Indicadores de C170 com COD_ITEM nao encontrado no 0200 e C100 sem C170
-  com ressalva de dispensa de registros em certos casos.
-- Exporte as novas tabelas para CSV ou Excel (XLSX) via menu existente;
-  QTD C170 com 5 casas decimais e valores em celulas numericas no XLSX.
-- Nova amostra 100% ficticia e testes de regressao.
-- Melhor distribuiçao dos botões do menu e etiquetas de contexto.
+NOVA NAVEGAÇÃO DE AUDITORIA
+- Auditoria Fiscal tornou-se catálogo de módulos: cards por propósito, escopo e status.
+- RN07: correção de créditos em uso/consumo movida para ferramenta separada, sem alterar o motor.
+- DIAG01: diagnóstico de bases, CST/alíquota e TIPO_ITEM 0200 agora exibido no workspace.
+- LEIT01: atalho de consulta das ocorrências de leitura.
+- ARQ01: cópia fiel de EFD .SPED/.TXT como ação do catálogo.
+- ST01 / CIAP01 aparecem como planejadas, com execução desabilitada.
 
-PRESERVADO
-- Interface corporativa, icones MIT e topo e rodape da v0.1.5.
-- Consulta avancada de documentos, C190, CFOP/CST, E110.
-- Relatorios PDF/XLSX consolidados da v0.1.5, sem mistura de bases.
-- Java 8 / JRE, sem instalar dependencias e sem transmissao.
+AJUDA INTEGRADA
+- Ajuda deixa de ser diálogo modal e passa a existir como página no workspace.
+- Manual offline: primeiros passos, ferramentas RN07/diagnóstico/leitura, arquivos originais
+  e substitutos, consultas, futuras ferramentas e limites.
+- Acesso pela barra lateral, menu Ajuda, botão superior e tecla F1.
+- Link "Entenda esta função" nos cards do catálogo.
+
+COMPATIBILIDADE
+- Preservados o motor RN07 da v0.1.10, C170/C190/C100/E110, relatórios de alterações,
+  validação interna, cópia fiel, formatos SPED/TXT e a finalidade COD_FIN.
+- Corrigida mensagem antiga de confirmação que dizia incorretamente que CST/ALIQ não mudavam.
+- Identificação de versão atualizada na interface e nos relatórios.
+
+TESTES
+- Catálogo, ajuda e navegabilidade em EFD original/substituta; RN07 e proteção de arquivos.
+- Conciliação real L5: 19 grupos / R$ 9.070,45, com geração de cópia temporária.
+- Não foi executado teste de validação no PVA oficial. Ferramentas planejadas não executam.

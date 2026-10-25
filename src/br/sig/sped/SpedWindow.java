@@ -61,7 +61,7 @@ import java.awt.event.KeyEvent;
 /** Desktop local: GUI inspirada no mockup aprovado, implementada inteiramente em Swing/Java 8. */
 public final class SpedWindow extends JFrame {
     private static final long serialVersionUID = 2L;
-    private static final String VERSAO="0.1.6";
+    private static final String VERSAO="0.1.11";
     private static final DecimalFormat MOEDA;
     private static final DecimalFormat QUANTIDADE;
     static {
@@ -72,7 +72,7 @@ public final class SpedWindow extends JFrame {
 
     private SpedParser.Resultado resultado;
     private File pastaAnterior;
-    private final JLabel status = UiKit.text("Pronto para importar um arquivo EFD ICMS/IPI (.txt).",11,false,FrameChrome.TEXT);
+    private final JLabel status = UiKit.text("Pronto para importar EFD ICMS/IPI (.txt ou .sped).",11,false,FrameChrome.TEXT);
     private final JLabel statusIcon = new JLabel(FrameChrome.statusIcon("busy"));
     private final JLabel empresa = UiKit.text("Nenhum SPED carregado",16,true,UiKit.NAVY);
     private final JLabel cnpj = UiKit.text("—",14,true,UiKit.NAVY);
@@ -125,6 +125,22 @@ public final class SpedWindow extends JFrame {
     private final JTable tabRelatorios=table();
     private final JTable tabItens=table();
     private final JTable tabProdutos=table();
+    private final JTable tabAuditoria=table();
+    private final JLabel catalogStatus=UiKit.caption("Abra uma EFD para utilizar as ferramentas de auditoria.");
+    private final java.util.List<JButton> acoesCatalogo=new java.util.ArrayList<JButton>();
+    private final java.util.List<CatalogoAuditoria.Ferramenta> ferramentasCatalogo=new java.util.ArrayList<CatalogoAuditoria.Ferramenta>();
+    private final JLabel diagnosticoTotais=UiKit.text("Nenhuma EFD carregada",13,true,UiKit.NAVY);
+    private final JTextArea diagnosticoTexto=new JTextArea();
+    private final javax.swing.JEditorPane helpText=new javax.swing.JEditorPane();
+    private final java.util.Map<String,JButton> helpTopics=new LinkedHashMap<String,JButton>();
+    private String helpTopic="inicio";
+
+    private final JLabel auditCount=UiKit.caption("Importe um SPED para verificar créditos por uso e consumo.");
+    private final JLabel auditTotal=UiKit.text("Crédito identificado: —",12,true,UiKit.NAVY);
+    private final javax.swing.JCheckBox auditSubstituta=new javax.swing.JCheckBox("Preparar como arquivo substituto (registro 0000, COD_FIN=1)",true);
+    private final JButton auditPreview=new UiKit.ActionButton("Prévia e salvar SPED/TXT",UiKit.icon("file",16,Color.WHITE),UiKit.BLUE,new Color(32,108,178),Color.WHITE);
+    private final JButton auditSaveCopy=new JButton("Salvar cópia .SPED/.TXT");
+    private List<CreditoUsoConsumo.Caso> casosAuditoria=new ArrayList<CreditoUsoConsumo.Caso>();
     private final JTextField itemTexto=new JTextField();
     private final JTextField itemNcm=new JTextField();
     private final JTextField itemCfop=new JTextField();
@@ -153,7 +169,7 @@ public final class SpedWindow extends JFrame {
         setLocationRelativeTo(null);
         getContentPane().setBackground(UiKit.BG);
         setIconImage(FrameChrome.appIcon());
-        openButton=FrameChrome.toolbarButton("Abrir SPED (.txt)","folder","Abrir SPED","(.txt)");
+        openButton=FrameChrome.toolbarButton("Abrir SPED (.txt/.sped)","folder","Abrir SPED","TXT/SPED");
         refreshButton=FrameChrome.toolbarButton("Atualizar consulta","refresh","Atualizar","consulta");
         exportButton=FrameChrome.toolbarButton("Exportar CSV","download","Exportar","CSV");
         construir();
@@ -184,6 +200,10 @@ public final class SpedWindow extends JFrame {
         centralCards.add(dataPage("Consolidação por CFOP", "Valores extraídos de C190, agrupados por operação + CFOP + CST. Não constituem apuração.", "grid", tabCfop, countCfop, totalsCfop),"cfop");
         centralCards.add(dataPage("Apuração declarada de ICMS", "E110: valores transmitidos no SPED. Sem recálculo dos impostos.", "calculator", tabE110, countE110, null),"e110");
         centralCards.add(relatoriosPage(),"reports");
+        centralCards.add(catalogoPage(),"audit");
+        centralCards.add(auditoriaPage(),"audit-credit");
+        centralCards.add(diagnosticoPage(),"audit-diagnostic");
+        centralCards.add(ajudaPage(),"help");
         centralCards.add(dataPage("Ocorrências de leitura", "Erros de estrutura, campos numéricos inválidos e avisos encontrados na importação.", "alert", tabOcorrencias, countOcorrencias, null),"issues");
         center.add(centralCards,BorderLayout.CENTER);
         workspace.add(center,BorderLayout.CENTER);
@@ -202,6 +222,7 @@ public final class SpedWindow extends JFrame {
         JMenuBar m=new JMenuBar();
         JMenu arquivo=new JMenu("Arquivo");
         menuItem(arquivo,"Abrir SPED (Ctrl+O)",()->abrir());
+        menuItem(arquivo,"Salvar cópia da EFD (.SPED ou .TXT)",()->salvarCopiaEfd());
         arquivo.addSeparator();menuItem(arquivo,"Sair",()->dispose());m.add(arquivo);
         JMenu consulta=new JMenu("Consulta");
         menuItem(consulta,"Notas C100 — consulta avançada",()->mostrar("docs"));
@@ -218,12 +239,20 @@ public final class SpedWindow extends JFrame {
         exportacao.addSeparator();
         menuItem(exportacao,"Relatório consolidado em Excel (.xlsx)",()->exportarRelatorioXlsx());
         menuItem(exportacao,"Relatório consolidado em PDF",()->exportarRelatorioPdf());
+        exportacao.addSeparator();
+        menuItem(exportacao,"Salvar cópia do SPED carregado (.SPED/.TXT)",()->salvarCopiaEfd());
         m.add(exportacao);
         JMenu ferramentas=new JMenu("Ferramentas");
         menuItem(ferramentas,"Atualizar consulta (F5)",()->preencher());
-        menuItem(ferramentas,"Limpar filtros",()->limparFiltros());m.add(ferramentas);
+        menuItem(ferramentas,"Limpar filtros",()->limparFiltros());
+        menuItem(ferramentas,"Catálogo de Auditoria Fiscal",()->mostrar("audit"));
+        menuItem(ferramentas,"Correção de créditos (MG-RN07)",()->mostrar("audit-credit"));
+        menuItem(ferramentas,"Diagnóstico complementar (bases/CST/0200)",()->mostrar("audit-diagnostic"));
+        m.add(ferramentas);
         JMenu ajuda=new JMenu("Ajuda");
-        menuItem(ajuda,"Sobre e limites",()->ajuda());m.add(ajuda);
+        menuItem(ajuda,"Manual do sistema",()->ajuda());
+        menuItem(ajuda,"Correção de créditos RN07",()->abrirAjuda("creditos"));
+        menuItem(ajuda,"Limites da aplicação",()->abrirAjuda("limites"));m.add(ajuda);
         return FrameChrome.decorateMenu(m);
     }
     private void menuItem(JMenu m,String s,Runnable r) {
@@ -234,6 +263,7 @@ public final class SpedWindow extends JFrame {
         addShortcut(p,"open",KeyStroke.getKeyStroke(KeyEvent.VK_O,KeyEvent.CTRL_DOWN_MASK),()->abrir());
         addShortcut(p,"export",KeyStroke.getKeyStroke(KeyEvent.VK_E,KeyEvent.CTRL_DOWN_MASK),()->exportar());
         addShortcut(p,"refresh",KeyStroke.getKeyStroke(KeyEvent.VK_F5,0),()->preencher());
+        addShortcut(p,"help",KeyStroke.getKeyStroke(KeyEvent.VK_F1,0),()->ajuda());
     }
     private void addShortcut(JComponent panel,String key,KeyStroke stroke,Runnable r) {
         panel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(stroke,key);
@@ -258,9 +288,16 @@ public final class SpedWindow extends JFrame {
         nav(nav,"analytic","Analítico - C190","analysis");
         nav(nav,"cfop","Por CFOP","grid");
         nav(nav,"e110","Apuração - E110","calculator");
+        nav(nav,"audit","Auditoria Fiscal","alert");
+        nav(nav,"help","Ajuda","info");
         nav(nav,"reports","Relatórios","analysis");
         nav(nav,"issues","Ocorrências","alert");
-        outer.add(nav,BorderLayout.NORTH);
+        JScrollPane navScroll=new JScrollPane(nav);
+        navScroll.setBorder(null);navScroll.setOpaque(false);navScroll.getViewport().setOpaque(false);
+        navScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        navScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+        navScroll.getVerticalScrollBar().setUnitIncrement(18);
+        outer.add(navScroll,BorderLayout.CENTER);
         JPanel footer=new JPanel();footer.setOpaque(false);footer.setBorder(BorderFactory.createEmptyBorder(14,18,20,10));
         footer.setLayout(new BoxLayout(footer,BoxLayout.Y_AXIS));
         footer.add(UiKit.text("LEITURA LOCAL",11,true,new Color(171,220,252)));
@@ -827,10 +864,348 @@ public final class SpedWindow extends JFrame {
             t.getColumnModel().getColumn(i).setPreferredWidth(w);
         }
     }
+    /** Área inicial de Auditoria Fiscal: descoberta de ferramentas, não execução implícita. */
+    private JPanel catalogoPage() {
+        JPanel whole=new JPanel(new BorderLayout(0,13));whole.setBackground(UiKit.BG);
+        whole.setBorder(BorderFactory.createEmptyBorder(0,16,16,16));
+        UiKit.Panel heading=new UiKit.Panel(UiKit.WHITE,UiKit.BORDER,16);
+        heading.setLayout(new BorderLayout(0,7));heading.setBorder(BorderFactory.createEmptyBorder(18,19,16,19));
+        JLabel title=UiKit.text("Auditoria Fiscal  /  Catálogo de ferramentas",19,true,UiKit.NAVY);
+        title.setIcon(UiKit.icon("alert",24,UiKit.BLUE));
+        heading.add(title,BorderLayout.NORTH);
+        JPanel desc=new JPanel();desc.setOpaque(false);desc.setLayout(new BoxLayout(desc,BoxLayout.Y_AXIS));
+        JLabel t=UiKit.text("Escolha uma função específica. Cada ferramenta possui seu escopo e suas limitações.",13,false,UiKit.SECONDARY);
+        t.setAlignmentX(Component.LEFT_ALIGNMENT);desc.add(t);desc.add(Box.createVerticalStrut(9));
+        catalogStatus.setAlignmentX(Component.LEFT_ALIGNMENT);desc.add(catalogStatus);
+        heading.add(desc,BorderLayout.CENTER);
+        JButton docs=new JButton("Abrir documentação");docs.addActionListener(e->ajuda());
+        heading.add(docs,BorderLayout.EAST);
+        whole.add(heading,BorderLayout.NORTH);
+        JPanel tools=new JPanel(new GridLayout(0,2,13,13));tools.setOpaque(false);
+        for(CatalogoAuditoria.Ferramenta tool:CatalogoAuditoria.todas())tools.add(cartaoAuditoria(tool));
+        JPanel content=new JPanel(new BorderLayout(0,13));content.setOpaque(false);
+        content.add(tools,BorderLayout.NORTH);
+        UiKit.Panel note=new UiKit.Panel(new Color(235,244,252),UiKit.BORDER,14);
+        note.setLayout(new BorderLayout());note.setBorder(BorderFactory.createEmptyBorder(12,16,12,16));
+        note.add(UiKit.text("A detecção de uma ocorrência não é, por si só, confirmação de erro fiscal. "+
+            "Nunca alteramos automaticamente o arquivo original.",12,false,UiKit.NAVY),BorderLayout.CENTER);
+        content.add(note,BorderLayout.SOUTH);
+        JScrollPane sc=new JScrollPane(content);
+        sc.setBorder(null);sc.getViewport().setBackground(UiKit.BG);
+        sc.getVerticalScrollBar().setUnitIncrement(18);
+        whole.add(sc,BorderLayout.CENTER);
+        return whole;
+    }
+    private JPanel cartaoAuditoria(final CatalogoAuditoria.Ferramenta tool) {
+        UiKit.Panel panel=new UiKit.Panel(UiKit.WHITE,UiKit.BORDER,15);
+        panel.setLayout(new BorderLayout(0,9));panel.setBorder(BorderFactory.createEmptyBorder(15,16,15,16));
+        JPanel title=new JPanel(new BorderLayout(10,0));title.setOpaque(false);
+        JLabel icon=new JLabel(UiKit.icon(tool.icone,26,tool.estado==CatalogoAuditoria.Estado.DISPONIVEL?UiKit.BLUE:UiKit.SECONDARY));
+        title.add(icon,BorderLayout.WEST);
+        JLabel heading=UiKit.text(tool.titulo,14,true,UiKit.NAVY);title.add(heading,BorderLayout.CENTER);
+        JLabel estado=UiKit.text(tool.estado==CatalogoAuditoria.Estado.DISPONIVEL?"DISPONÍVEL":"PLANEJADA",10,true,
+            tool.estado==CatalogoAuditoria.Estado.DISPONIVEL?UiKit.GREEN:UiKit.SECONDARY);
+        title.add(estado,BorderLayout.EAST);panel.add(title,BorderLayout.NORTH);
+        JPanel details=new JPanel();details.setOpaque(false);details.setLayout(new BoxLayout(details,BoxLayout.Y_AXIS));
+        JLabel code=UiKit.text(tool.id+"  •  "+tool.abrangencia,11,true,UiKit.BLUE);code.setAlignmentX(Component.LEFT_ALIGNMENT);
+        details.add(code);details.add(Box.createVerticalStrut(8));
+        JTextArea descricao=textoAjustavel(tool.descricao,12,2);
+        descricao.setAlignmentX(Component.LEFT_ALIGNMENT);details.add(descricao);
+        details.add(Box.createVerticalStrut(6));
+        JTextArea aviso=textoAjustavel(tool.aviso,11,2);aviso.setForeground(UiKit.SECONDARY);
+        aviso.setAlignmentX(Component.LEFT_ALIGNMENT);details.add(aviso);
+        panel.add(details,BorderLayout.CENTER);
+        JPanel actions=new JPanel(new FlowLayout(FlowLayout.LEFT,8,0));actions.setOpaque(false);
+        JButton action=new JButton(tool.estado==CatalogoAuditoria.Estado.PLANEJADA?"Em planejamento":"Abrir ferramenta");
+        action.setFont(UiKit.font(12,true));
+        action.addActionListener(e->{
+            if("copy".equals(tool.pagina))salvarCopiaEfd();
+            else if(tool.pagina!=null && !tool.pagina.isEmpty())mostrar(tool.pagina);
+        });
+        action.setEnabled(tool.executavel(false));
+        acoesCatalogo.add(action);ferramentasCatalogo.add(tool);
+        JButton learn=new JButton("Entenda esta função");learn.setFont(UiKit.font(12,false));
+        learn.addActionListener(e->abrirAjuda(tool.topicoAjuda));
+        actions.add(action);actions.add(learn);panel.add(actions,BorderLayout.SOUTH);
+        panel.setPreferredSize(new Dimension(350,207));
+        return panel;
+    }
+    private static JTextArea textoAjustavel(String texto,int tamanho,int linhas) {
+        JTextArea area=new JTextArea(texto);area.setEditable(false);area.setLineWrap(true);area.setWrapStyleWord(true);
+        area.setOpaque(false);area.setFont(UiKit.font(tamanho,false));area.setForeground(UiKit.NAVY);
+        area.setRows(linhas);area.setFocusable(false);return area;
+    }
+    /** O diagnóstico antes modal é agora um painel consultivo, sempre dentro do workspace. */
+    private JPanel diagnosticoPage() {
+        JPanel page=new JPanel(new BorderLayout(0,12));page.setBackground(UiKit.BG);
+        page.setBorder(BorderFactory.createEmptyBorder(0,16,16,16));
+        UiKit.Panel card=new UiKit.Panel(UiKit.WHITE,UiKit.BORDER,16);
+        card.setLayout(new BorderLayout(0,12));card.setBorder(BorderFactory.createEmptyBorder(15,17,15,17));
+        JPanel head=new JPanel(new BorderLayout(8,8));head.setOpaque(false);
+        JPanel title=new JPanel();title.setOpaque(false);title.setLayout(new BoxLayout(title,BoxLayout.Y_AXIS));
+        title.add(UiKit.text("Diagnóstico complementar — bases, CST e 0200",17,true,UiKit.NAVY));
+        title.add(Box.createVerticalStrut(7));
+        title.add(UiKit.caption("Relatório de indícios para análise. Não modifica os registros da EFD."));
+        head.add(title,BorderLayout.CENTER);
+        JButton help=new JButton("Como interpretar");help.addActionListener(e->abrirAjuda("diagnostico"));
+        head.add(help,BorderLayout.EAST);card.add(head,BorderLayout.NORTH);
+        diagnosticoTexto.setEditable(false);diagnosticoTexto.setFont(new Font(Font.MONOSPACED,Font.PLAIN,12));
+        diagnosticoTexto.setLineWrap(false);diagnosticoTexto.setText("Abra uma EFD para gerar o diagnóstico.");
+        JScrollPane report=new JScrollPane(diagnosticoTexto);
+        report.setBorder(BorderFactory.createLineBorder(UiKit.BORDER));
+        card.add(report,BorderLayout.CENTER);
+        JPanel footer=new JPanel(new BorderLayout());footer.setOpaque(false);
+        footer.add(diagnosticoTotais,BorderLayout.CENTER);
+        JPanel buttons=new JPanel(new FlowLayout(FlowLayout.RIGHT,8,0));buttons.setOpaque(false);
+        JButton back=new JButton("Voltar ao catálogo");back.addActionListener(e->mostrar("audit"));
+        JButton products=new JButton("Consultar cadastro 0200");products.addActionListener(e->mostrar("products"));
+        buttons.add(products);buttons.add(back);footer.add(buttons,BorderLayout.EAST);
+        card.add(footer,BorderLayout.SOUTH);page.add(card,BorderLayout.CENTER);
+        return page;
+    }
+    private void atualizarDiagnostico() {
+        if(resultado==null){diagnosticoTexto.setText("Abra uma EFD para gerar o diagnóstico.");return;}
+        PendenciasTributarias.Resumo r=PendenciasTributarias.analisar(resultado);
+        diagnosticoTotais.setText(r.basesSemCredito+" bases (R$ "+MOEDA.format(r.valorBases)+")  •  "+
+            r.c170AliquotaSemCredito+" alíquotas  •  "+r.produtosClassificacaoDuvidosa+" produtos a conferir");
+        diagnosticoTexto.setText(r.relatorio);diagnosticoTexto.setCaretPosition(0);
+    }
+    /** Documentação interna offline, com os tópicos acessíveis por navegação. */
+    private JPanel ajudaPage() {
+        JPanel page=new JPanel(new BorderLayout(0,12));page.setBackground(UiKit.BG);
+        page.setBorder(BorderFactory.createEmptyBorder(0,16,16,16));
+        UiKit.Panel heading=new UiKit.Panel(UiKit.WHITE,UiKit.BORDER,14);
+        heading.setLayout(new BorderLayout());heading.setBorder(BorderFactory.createEmptyBorder(14,18,14,18));
+        JLabel title=UiKit.text("Ajuda e documentação",18,true,UiKit.NAVY);
+        title.setIcon(UiKit.icon("info",22,UiKit.BLUE));heading.add(title,BorderLayout.WEST);
+        heading.add(UiKit.caption("Manual integrado · Sem acesso à internet"),BorderLayout.EAST);
+        page.add(heading,BorderLayout.NORTH);
+        UiKit.Panel body=new UiKit.Panel(UiKit.WHITE,UiKit.BORDER,14);body.setLayout(new BorderLayout());
+        JPanel topics=new JPanel();topics.setOpaque(false);topics.setLayout(new BoxLayout(topics,BoxLayout.Y_AXIS));
+        topics.setBorder(BorderFactory.createEmptyBorder(16,12,16,12));
+        String[][] labels={{"inicio","Primeiros passos"},{"consultas","Consultas e relatórios"},
+            {"creditos","Correção de créditos RN07"},{"diagnostico","Bases, CST e 0200"},
+            {"ocorrencias","Ocorrências de leitura"},{"arquivos","Arquivos e substitutas"},
+            {"futuras","Próximas ferramentas"},{"limites","Limites do sistema"}};
+        for(String[] row:labels){
+            final String topic=row[0];
+            JButton btn=new JButton(row[1]);btn.setFont(UiKit.font(12,false));
+            btn.setHorizontalAlignment(SwingConstants.LEFT);
+            btn.setAlignmentX(Component.LEFT_ALIGNMENT);
+            btn.setMaximumSize(new Dimension(215,39));btn.setPreferredSize(new Dimension(215,39));
+            btn.setFocusPainted(false);
+            btn.addActionListener(e->selecionarTopico(topic));topics.add(btn);topics.add(Box.createVerticalStrut(6));
+            helpTopics.put(topic,btn);
+        }
+        body.add(topics,BorderLayout.WEST);
+        helpText.setContentType("text/html");helpText.setEditable(false);
+        helpText.setBorder(BorderFactory.createEmptyBorder(6,5,5,5));
+        JScrollPane sc=new JScrollPane(helpText);sc.setBorder(BorderFactory.createMatteBorder(0,1,0,0,UiKit.BORDER));
+        sc.getVerticalScrollBar().setUnitIncrement(16);body.add(sc,BorderLayout.CENTER);
+        page.add(body,BorderLayout.CENTER);
+        selecionarTopico("inicio");
+        return page;
+    }
+    private void selecionarTopico(String topic) {
+        helpTopic=AjudaInterna.contem(topic)?topic:"inicio";
+        helpText.setText(AjudaInterna.conteudo(helpTopic));helpText.setCaretPosition(0);
+        for(java.util.Map.Entry<String,JButton> item:helpTopics.entrySet()){
+            boolean selected=item.getKey().equals(helpTopic);
+            item.getValue().setBackground(selected?UiKit.SKY:UiKit.WHITE);
+            item.getValue().setForeground(selected?UiKit.BLUE:UiKit.NAVY);
+            item.getValue().setFont(UiKit.font(12,selected));
+        }
+    }
+    private void abrirAjuda(String topic) {selecionarTopico(topic);mostrar("help");}
+    /** Pesquisa MG-RN07: ocorrência potencial, sem julgar a destinação real dos bens. */
+    private JPanel auditoriaPage() {
+        JPanel page = dataPage("Créditos de uso e consumo • MG-RN07",
+            "Crédito de ICMS em compras para uso e consumo (CFOP 1.556/2.556/3.556). Somente ocorrências selecionadas serão propostas para correção.",
+            "alert", tabAuditoria, auditCount, auditTotal);
+        JPanel bottom = new JPanel(new BorderLayout(12,8));bottom.setOpaque(false);
+        bottom.setBorder(BorderFactory.createEmptyBorder(8,14,12,14));
+        JTextArea orientacao=new JTextArea("SUSPEITA, NÃO AUTUAÇÃO: confirme a destinação efetiva dos bens antes de corrigir. " +
+            "Corrige somente os grupos selecionados e conciliados (CST/ALIQ/BC/ICMS de C170 e C190, " +
+            "com reflexos em C100/E110 e fechamento). A base sem crédito fora da seleção e TIPO_ITEM 0200 " +
+            "continuam para revisão humana. Apuração complexa é bloqueada. Nunca altera o original.");
+        orientacao.setEditable(false);orientacao.setLineWrap(true);orientacao.setWrapStyleWord(true);
+        orientacao.setRows(2);orientacao.setPreferredSize(new Dimension(850,35));
+        orientacao.setOpaque(false);orientacao.setForeground(UiKit.SECONDARY);orientacao.setFont(UiKit.font(12,false));
+        JPanel instructions=new JPanel();instructions.setOpaque(false);
+        instructions.setLayout(new BoxLayout(instructions,BoxLayout.Y_AXIS));
+        instructions.add(orientacao);
+        auditSubstituta.setOpaque(false);
+        auditSubstituta.setFont(UiKit.font(12,false));
+        instructions.add(auditSubstituta);
+        JButton pendencias=new JButton("Ver diagnóstico de bases, CST e produtos (0200)");
+        pendencias.addActionListener(e->mostrar("audit-diagnostic"));
+        pendencias.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
+        instructions.add(pendencias);
+        bottom.add(instructions,BorderLayout.CENTER);
+        JPanel actions=new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT,8,0));actions.setOpaque(false);
+        JButton selecionar=new JButton("Marcar conciliados");
+        JButton desmarcar=new JButton("Desmarcar todos");
+        selecionar.addActionListener(e->marcarAuditoria(true));
+        desmarcar.addActionListener(e->marcarAuditoria(false));
+        actions.add(selecionar);actions.add(desmarcar);actions.add(auditSaveCopy);actions.add(auditPreview);
+        auditSaveCopy.addActionListener(e->salvarCopiaEfd());
+        auditSaveCopy.setEnabled(false);
+        bottom.add(actions,BorderLayout.SOUTH);
+        auditPreview.setEnabled(false);
+        auditPreview.addActionListener(e->previsualizarAuditoria());
+        page.add(bottom,BorderLayout.SOUTH);
+        JPanel navBar=new JPanel(new FlowLayout(FlowLayout.LEFT,8,4));navBar.setOpaque(false);
+        JButton back=new JButton("← Voltar ao catálogo");back.addActionListener(e->mostrar("audit"));
+        JButton learn=new JButton("Ajuda da ferramenta");learn.addActionListener(e->abrirAjuda("creditos"));
+        navBar.add(back);navBar.add(learn);page.add(navBar,BorderLayout.NORTH);
+        return page;
+    }
+    private void marcarAuditoria(boolean marcar) {
+        DefaultTableModel model=(DefaultTableModel)tabAuditoria.getModel();
+        for(int i=0;i<model.getRowCount();i++)
+            if(Boolean.TRUE.equals(model.getValueAt(i,10)))model.setValueAt(Boolean.valueOf(marcar),i,0);
+    }
+    private void atualizarAuditoria() {
+        if(resultado==null)return;
+        casosAuditoria=CreditoUsoConsumo.analisar(resultado);
+        DefaultTableModel model=new DefaultTableModel(new Object[]{
+            "Corrigir?","NF-e","Emitente / participante","CFOP","CST","Alíq.",
+            "Crédito (R$)","Itens C170","Linha C190","Conferência"},0) {
+            @Override public boolean isCellEditable(int r,int c){return c==0 && Boolean.TRUE.equals(getValueAt(r,10));}
+            @Override public Class<?> getColumnClass(int c){return c==0||c==10?Boolean.class:super.getColumnClass(c);}
+        };
+        // Coluna técnica 10 é adicionada e escondida da visualização para habilitar apenas registros conciliados.
+        model.setColumnIdentifiers(new Object[]{"Corrigir?","NF-e","Participante","CFOP","CST","Alíq.",
+            "Crédito (R$)","Itens C170","Linha C190","Conferência","Elegível"});
+        BigDecimal total=BigDecimal.ZERO;int disponiveis=0;
+        for(CreditoUsoConsumo.Caso c:casosAuditoria){
+            total=total.add(c.credito);if(c.elegivel)disponiveis++;
+            model.addRow(new Object[]{Boolean.FALSE,c.nota,c.participante,c.cfop,c.cst,c.aliquota,
+                MOEDA.format(c.credito),Integer.valueOf(c.itens),Integer.valueOf(c.linhaC190),c.motivo,Boolean.valueOf(c.elegivel)});
+        }
+        tabAuditoria.setModel(model);
+        tabAuditoria.removeColumn(tabAuditoria.getColumnModel().getColumn(10));
+        tabAuditoria.setAutoCreateRowSorter(true);
+        int[] widths={80,90,195,66,63,65,115,90,96,250};
+        for(int i=0;i<widths.length;i++)tabAuditoria.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
+        tabAuditoria.setRowHeight(29);
+        if(tabAuditoria.getColumnModel().getColumnCount()>0)
+            tabAuditoria.getColumnModel().getColumn(0).setMaxWidth(87);
+        auditCount.setText("Arquivo "+("1".equals(resultado.codFin)?"SUBSTITUTO (COD_FIN=1)":"ORIGINAL (COD_FIN=0)")+
+                " | "+casosAuditoria.size()+" grupos suspeitos; "+disponiveis+" elegíveis. A marcação é manual.");
+        auditSubstituta.setSelected(true); // recomendacao de gravar substituta, inclusive quando origem COD_FIN=0
+        auditSubstituta.setEnabled(!"1".equals(resultado.codFin));
+        auditSubstituta.setText("1".equals(resultado.codFin)
+                ?"Arquivo já substituto: manter COD_FIN=1"
+                :"Preparar arquivo substituto (COD_FIN=1; desmarque apenas se for remessa original)");
+        auditSaveCopy.setEnabled(true);
+        PendenciasTributarias.Resumo diagnostico=PendenciasTributarias.analisar(resultado);
+        auditTotal.setText("RN07: R$ "+MOEDA.format(total)+"  |  Bases sem crédito: R$ "+
+            MOEDA.format(diagnostico.valorBases)+" ("+diagnostico.basesSemCredito+")  |  0200 a conferir: "+
+            diagnostico.produtosClassificacaoDuvidosa);
+        auditPreview.setEnabled(disponiveis>0);
+    }
+    private void previsualizarAuditoria() {
+        if(resultado==null)return;
+        java.util.Set<Integer> selected=new java.util.LinkedHashSet<Integer>();
+        DefaultTableModel model=(DefaultTableModel)tabAuditoria.getModel();
+        for(int i=0;i<model.getRowCount();i++)if(Boolean.TRUE.equals(model.getValueAt(i,0)))
+            selected.add(((Number)model.getValueAt(i,8)).intValue());
+        if(selected.isEmpty()){
+            JOptionPane.showMessageDialog(this,"Marque ao menos uma linha na coluna 'Corrigir?'.",
+                "Nenhum grupo selecionado",JOptionPane.INFORMATION_MESSAGE);return;
+        }
+        final CreditoUsoConsumo.Plano plano;
+        try{plano=CreditoUsoConsumo.planejar(resultado,selected,auditSubstituta.isSelected());}
+        catch(Exception ex){JOptionPane.showMessageDialog(this,ex.getMessage(),"Correção bloqueada",JOptionPane.WARNING_MESSAGE);return;}
+        JTextArea preview=new JTextArea(20,82);
+        StringBuilder sb=new StringBuilder();
+        sb.append(plano.resumo).append("\n\nMUDANÇAS (nenhuma aplicada ainda):\n");
+        for(CreditoUsoConsumo.Mudanca m:plano.mudancas)sb.append(m.toString()).append('\n');
+        preview.setText(sb.toString());preview.setCaretPosition(0);preview.setEditable(false);
+        preview.setFont(new Font(Font.MONOSPACED,Font.PLAIN,12));
+        javax.swing.JCheckBox confirmacao=new javax.swing.JCheckBox(
+            "Confirmei documentalmente: as mercadorias são de uso/consumo e o crédito não é permitido.");
+        JPanel content=new JPanel(new BorderLayout(8,12));
+        content.add(new JScrollPane(preview),BorderLayout.CENTER);
+        content.add(confirmacao,BorderLayout.SOUTH);
+        int ok=JOptionPane.showConfirmDialog(this,content,"Prévia de correção fiscal (SPED/TXT)",
+                JOptionPane.OK_CANCEL_OPTION,JOptionPane.WARNING_MESSAGE);
+        if(ok!=JOptionPane.OK_OPTION)return;
+        if(!confirmacao.isSelected()){
+            JOptionPane.showMessageDialog(this,"Confirmação fiscal obrigatória; nada foi gravado.",
+                "Operação cancelada",JOptionPane.INFORMATION_MESSAGE);return;
+        }
+        File destino=escolherDestinoEfd("Salvar NOVA EFD corrigida", "-corrigido-RN07");
+        if(destino==null)return;
+        try{
+            File saida=CreditoUsoConsumo.salvar(plano,destino);
+            JOptionPane.showMessageDialog(this,"Arquivo corrigido salvo em:\n"+saida.getAbsolutePath()+
+                "\n\nOriginal preservado. Revise CST, base, alíquota e classificação 0200; "+
+                "importe no PVA e valide antes de transmitir.",
+                "EFD corrigida criada",JOptionPane.INFORMATION_MESSAGE);
+            atualizarStatus("EFD corrigida salva ("+extensao(destino)+"). Diagnóstico complementar e PVA ainda necessários.","ok");
+        }catch(Exception ex){JOptionPane.showMessageDialog(this,ex.getMessage(),"Não foi possível salvar",JOptionPane.ERROR_MESSAGE);}
+    }
+
+    private void exibirPendencias() {
+        if(resultado==null){JOptionPane.showMessageDialog(this,"Importe uma EFD para diagnosticar.");return;}
+        atualizarDiagnostico();mostrar("audit-diagnostic");
+    }
+
+    /** Permite .SPED e .TXT; escolha do filtro decide extensao se nao digitada. */
+    private File escolherDestinoEfd(String titulo,String sufixo) {
+        if(resultado==null){
+            JOptionPane.showMessageDialog(this,"Abra primeiro um SPED original ou substituto.");return null;
+        }
+        JFileChooser fc=new JFileChooser(resultado.arquivo.getParentFile());
+        fc.setDialogTitle(titulo+" (sem sobrescrever)");
+        FileNameExtensionFilter sped=new FileNameExtensionFilter("Arquivo SPED (*.sped)","sped");
+        FileNameExtensionFilter txt=new FileNameExtensionFilter("Texto EFD (*.txt)","txt");
+        fc.setAcceptAllFileFilterUsed(false);
+        fc.addChoosableFileFilter(sped);fc.addChoosableFileFilter(txt);
+        fc.setFileFilter(sped);
+        String nome=resultado.arquivo.getName().replaceAll("(?i)\\.(txt|sped)$","")+sufixo+".sped";
+        fc.setSelectedFile(new File(resultado.arquivo.getParentFile(),nome));
+        fc.addPropertyChangeListener(JFileChooser.FILE_FILTER_CHANGED_PROPERTY, event->{
+            String selecionado=fc.getSelectedFile()==null?"":fc.getSelectedFile().getName();
+            String novo=selecionado.replaceAll("(?i)\\.(sped|txt)$","")+(fc.getFileFilter()==txt?".txt":".sped");
+            if(!selecionado.isEmpty())fc.setSelectedFile(new File(fc.getCurrentDirectory(),novo));
+        });
+        if(fc.showSaveDialog(this)!=JFileChooser.APPROVE_OPTION)return null;
+        try{
+            String preferida=fc.getFileFilter()==txt?"txt":"sped";
+            return SpedFileIO.comExtensao(fc.getSelectedFile(),preferida);
+        }catch(java.io.IOException e){
+            JOptionPane.showMessageDialog(this,e.getMessage(),"Extensão inválida",JOptionPane.WARNING_MESSAGE);
+            return null;
+        }
+    }
+    private static String extensao(File f) {
+        return f.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".sped")?".SPED":".TXT";
+    }
+    /** Cópia de bytes: não mexe em CST, COD_FIN, finalizadores, charset ou quebras de linha. */
+    private void salvarCopiaEfd() {
+        if(resultado==null){JOptionPane.showMessageDialog(this,"Importe um arquivo SPED antes de salvar.");return;}
+        File destino=escolherDestinoEfd("Salvar cópia exata da EFD", "-copia");
+        if(destino==null)return;
+        try{
+            SpedFileIO.copiar(resultado,destino);
+            JOptionPane.showMessageDialog(this,"Cópia salva: "+destino.getAbsolutePath()+
+                "\nCOD_FIN="+resultado.codFin+("1".equals(resultado.codFin)?" (substituta)":" (original)")+
+                "\n\nCópia byte a byte. A extensão não valida o conteúdo. Abra no PVA para validar.",
+                "Cópia EFD salva",JOptionPane.INFORMATION_MESSAGE);
+            atualizarStatus("Cópia "+extensao(destino)+" salva com finalidade original preservada.","ok");
+        }catch(Exception ex){
+            JOptionPane.showMessageDialog(this,"Falha ao salvar cópia:\n"+ex.getMessage(),"Exportação bloqueada",JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
     private void mostrar(String id) {
-        if(!navButtons.containsKey(id))return;
+        if(!navButtons.containsKey(id) && !"audit-credit".equals(id) && !"audit-diagnostic".equals(id))return;
         currentPage=id;((CardLayout)centralCards.getLayout()).show(centralCards,id);
-        for(Map.Entry<String,UiKit.NavButton> e:navButtons.entrySet()) e.getValue().setActive(id.equals(e.getKey()));
+        String navId=id.startsWith("audit-")?"audit":id;
+        for(Map.Entry<String,UiKit.NavButton> e:navButtons.entrySet()) e.getValue().setActive(navId.equals(e.getKey()));
         filterArea.setVisible("analytic".equals(id)||"cfop".equals(id)||"reports".equals(id));
         centralCards.revalidate();centralCards.repaint();
     }
@@ -862,11 +1237,18 @@ public final class SpedWindow extends JFrame {
         for(JTextField t:new JTextField[]{docNumero,docSerie,docChave,docParticipante,docData})t.setEnabled(loaded);
         docOperacao.setEnabled(loaded);
         docsDetailsButton.setEnabled(loaded && tabNotas.getSelectedRow()>=0);
+        auditPreview.setEnabled(loaded && !casosAuditoria.isEmpty());
+        auditSaveCopy.setEnabled(loaded);
+        for(int i=0;i<acoesCatalogo.size();i++)
+            acoesCatalogo.get(i).setEnabled(ferramentasCatalogo.get(i).executavel(loaded));
+        catalogStatus.setText(loaded?
+            "EFD carregada: "+("1".equals(resultado.codFin)?"SUBSTITUTA (COD_FIN=1)":"ORIGINAL (COD_FIN=0)")+
+            "  •  Ferramentas disponíveis para análise.":"Abra uma EFD original ou substituta para habilitar as ferramentas.");
     }
     private void abrir() {
         JFileChooser fc=new JFileChooser(pastaAnterior==null ? new File(System.getProperty("user.home")) : pastaAnterior);
-        fc.setDialogTitle("Abrir SPED Fiscal — EFD ICMS/IPI (.txt)");
-        fc.setFileFilter(new FileNameExtensionFilter("Arquivo SPED (*.txt)","txt"));
+        fc.setDialogTitle("Abrir SPED Fiscal — EFD ICMS/IPI (.txt ou .sped)");
+        fc.setFileFilter(new FileNameExtensionFilter("Arquivo SPED (*.txt, *.sped)","txt","sped"));
         if(fc.showOpenDialog(this)!=JFileChooser.APPROVE_OPTION)return;
         File selected=fc.getSelectedFile();pastaAnterior=selected.getParentFile();
         openButton.setEnabled(false);setHasData(false);
@@ -890,6 +1272,8 @@ public final class SpedWindow extends JFrame {
     }
     private void preencher() {
         if(resultado==null)return;
+        atualizarAuditoria();
+        atualizarDiagnostico();
         SpedParser.Resultado r=resultado;
         empresa.setText(r.nome.isEmpty()?"(não identificada)":r.nome);
         empresa.setToolTipText(r.nome);cnpj.setText(formatCnpj(r.cnpj));uf.setText(r.uf);
@@ -899,7 +1283,7 @@ public final class SpedWindow extends JFrame {
         situation.setText("✓  Arquivo carregado com sucesso");situation.setForeground(UiKit.GREEN);
         fileInfo.setText("Arquivo:   "+abbreviate(r.arquivo.getAbsolutePath(),100));
         fileInfo.setToolTipText(r.arquivo.getAbsolutePath());
-        versionInfo.setText("COD_VER do leiaute:   "+r.codVer);
+        versionInfo.setText("COD_VER:   "+r.codVer+"   |   Finalidade: "+("1".equals(r.codFin)?"SUBSTITUTA (COD_FIN=1)":"ORIGINAL (COD_FIN=0)"));
         charsetInfo.setText("Codificação:   "+r.charset);
         linesInfo.setText("Linhas lidas:   "+fmtCount(r.linhasLidas));
         countsInfo.setText("Registros C170: "+fmtCount(r.itens.size())+"   |   Itens 0200: "+fmtCount(r.produtos.size())+"   |   Registros E100:  "+r.countE100+"    |    Registros E110:  "+r.countE110+"    |    Linhas descartadas:  "+r.linhasIgnoradas);
@@ -1072,24 +1456,7 @@ public final class SpedWindow extends JFrame {
     private JTable tabelaDaPagina() {
         switch(currentPage){case "docs":return tabNotas;case "items":return tabItens;case "products":return tabProdutos;case "analytic":return tabC190;case "cfop":return tabCfop;case "e110":return tabE110;case "issues":return tabOcorrencias;case "reports":return tabRelatorios;default:return null;}
     }
-    private void ajuda() {
-        JOptionPane.showMessageDialog(this,"Extrator SPED Fiscal v"+VERSAO+"\n\n"+
-            "Filtros por operação, CFOP e CST atuam em C190 e Por CFOP.\n"+
-            "Escolha CFOP/CST nas listas ou busque parte do código; todos os filtros são combinados.\n"+
-            "Na aba C100, localize notas por número, série, chave, data, participante e operação.\n"+
-            "Em Itens C170, consulte códigos, descrições, NCM (0200), CFOP, CST e operação.\n"+
-            "Cadastro 0200 apresenta os produtos declarados, inclusive sem C170 no período.\n"+
-            "C170 não aparece necessariamente em todas as notas. Não deduza omissão sem examinar a legislação.\n"+
-            "Para ver o C100 e seus C190 vinculados: clique duas vezes na nota ou pressione Enter.\n"+
-            "Ordene emissão e valores clicando nos títulos das colunas.\n"+
-            "Notas C100 e apuração E110 continuam mostrando os valores declarados.\n"+
-            "O CSV e o Excel da tabela exportam as linhas atualmente visíveis.\n"+
-            "Relatórios XLSX e PDF consolidam os C190 conforme filtros ativos; C100/E110 ficam separados.\n"+
-            "Use a aba Relatórios para exportar um demonstrativo consolidado.\n\n"+
-            "Programa local, sem transmissão e sem modificação do SPED.\n"+
-            "Valores são declarados; ferramenta não recalcula tributos nem substitui o PVA.",
-            "Sobre o Extrator SPED Fiscal",JOptionPane.INFORMATION_MESSAGE);
-    }
+    private void ajuda() { mostrar("help"); }
     private static String abbreviate(String s,int max) {
         if(s.length()<=max)return s;
         return s.substring(0,Math.max(10,max-43))+" ... "+s.substring(s.length()-38);

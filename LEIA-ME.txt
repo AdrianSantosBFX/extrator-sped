@@ -1,57 +1,50 @@
-EXTRATOR SPED FISCAL — v0.1.6
-============================================
-Aplicativo Windows / Java 8. Executa com JRE; o JDK NAO e exigido no PC.
-Software 100% local: nao transmite arquivos e nao modifica o TXT original.
+EXTRATOR SPED FISCAL — VERSÃO 0.1.11
+==================================
+Programa local para Windows / Java 8+. Código-fonte incluído.
 
-COMO EXECUTAR
-  1. Extraia todo o ZIP em uma pasta do Windows.
-  2. Abra iniciar_extrator.bat (ou java -jar ExtratorSPED-v0.1.6.jar).
-  3. Abra um TXT EFD ICMS/IPI em Abrir SPED.
-  4. Experimente primeiro exemplo_sped_itens_ficticio.txt (100% ficticio).
-  5. Use o menu lateral "Itens - C170" para filtrar por:
-      - Codigo interno do item ou descricao (cadastro 0200 + DESCR_COMPL),
-      - NCM cadastrado no 0200, CFOP, CST e entrada/saida.
-  6. "Produtos - 0200" lista todo o cadastro 0200, inclusive produtos sem C170;
-     filtre por codigo/descricao e NCM.
-  7. Em "Notas - C100", de dois cliques na nota: aparecem duas abas,
-     Analiticos C190 e Itens C170 vinculados ao documento.
-  8. Exporte CSV pelo botao superior ou XLSX pelo menu Exportacao >
-     Exportar XLSX da tabela atual. Respeita filtros e ordenacao da tabela.
-  9. Na aba Relatorios, a consolidacao de XLSX/PDF permanece BASEADA EM C190,
-     separada de C100 e E110; nao inclui totals C170 no mesmo demonstrativo.
+INICIAR
+1. Extraia TODO o conteúdo do ZIP para uma pasta.
+2. Abra iniciar_extrator.bat (é necessário ter Java instalado).
+3. Clique em Abrir SPED e importe um arquivo EFD ICMS/IPI .SPED ou .TXT.
+   Aceita finalidades COD_FIN=0 (original) e COD_FIN=1 (substituta).
 
-CONTROLE DE QUALIDADE
-  - C170: NUM_ITEM, COD_ITEM, descricao 0200, NCM 0200, QTD, UNID, CFOP, CST,
-    VL_ITEM, descontos, bases, ICMS, ICMS-ST, IPI.
-  - Referencia 0200 resolvida pelo COD_ITEM apos a leitura completa.
-  - COD_ITEM nao encontrado no 0200 aparece como indicador/ocorrencia cadastral.
-  - C100 sem C170 recebe contagem INFORMATIVA, nunca diagnostico automatico
-    de omissao. O C170 pode ser dispensado conforme modelo/emissor/COD_SIT.
-  - NCM em branco nao e automaticamente erro; depende de hipotese legal.
-  - Valores declarados em C100/C170/C190/E110 sao bases diferentes:
-    NUNCA some esses totais entre si (duplicacao).
-  - Operacoes canceladas ou especiais podem constar nos registros brutos;
-    consulte COD_SIT antes de avaliar totais.
-  - Somas de itens C170 sao apenas dos ITENS LIDOS (nao toda a NF-e).
-  - Campos monetarios invalidos sao destacados nas ocorrencias e nao
-    somados no respectivo campo; a apuracao fiscal NAO e recalculada.
-  - Nos itens C170, campo vazio aparece como nao informado (—), sem virar
-    zero declarado. QTD em branco pode decorrer de excecoes de 2026.
-  - Nao faz validacao de PVA/SEFAZ nem comparacao com XML ou calculo de impostos.
-  - O antigo exemplo_sped_ficticio.txt demonstra arquivos SEM C170/0200.
-  - Siga as politicas de TI e privacidade de sua empresa antes de utilizar.
+AUDITORIA FISCAL — CATÁLOGO DE FERRAMENTAS
+A opção Auditoria Fiscal da barra lateral agora apresenta as funções em cards:
+- RN07 / Créditos de uso e consumo: correção assistida de grupos com CFOP 1.556,
+  2.556 ou 3.556, depois da comprovação da destinação, da revisão da prévia
+  e da seleção manual das ocorrências elegíveis.
+- DIAG01 / Bases, CST e cadastro 0200: aponta situações que merecem revisão;
+  apenas visualiza e NÃO grava alterações.
+- LEIT01 / Ocorrências de leitura: mostra avisos encontrados na importação.
+- ARQ01 / Cópia fiel da EFD: duplica o conteúdo para .SPED/.TXT sem alteração.
+- ST01 e CIAP01: funcionalidades planejadas; não corrigem nem validam nada.
 
-REFERENCIA TECNICA
-  Guia Pratico EFD ICMS/IPI 3.2.4, publicado em 10/09/2026,
-  registro 0200 e registro C170, v. norma oficial:
-  https://www.gov.br/sped/pt-br/assuntos/escrituracoes-digitais/efd-icms-ipi/manuais-e-documentos-tecnicos/guia-pratico-efd-versao-3-2-4.pdf
+COMO USAR O MÓDULO RN07
+1. Abra Auditoria Fiscal > Créditos de uso e consumo > Abrir ferramenta.
+2. Examine linhas e comprovantes; marque somente grupos suportados que tenham
+   crédito indevido devidamente confirmado.
+3. Revise a prévia, confirme a destinação e salve em novo .SPED ou .TXT.
+4. O original permanece intacto. O sistema gera relatório de auditoria ao lado
+   da cópia corrigida. A correção pode ajustar C170, C190, C100 e E110.
+5. Reimporte o arquivo, confira os dados e valide no PVA oficial.
 
-CONTEUDO
-  ExtratorSPED-v0.1.6.jar — Compilado Java 8 (major 52)
-  iniciar_extrator.bat — Execucao no Windows sem JDK
-  exemplo_sped_itens_ficticio.txt — Teste completo de C170 + 0200
-  exemplo_sped_ficticio.txt — Regressao legado (sem itens)
-  src/ — Codigo fonte + testes
-  assets/tabler/ — Icones e licenca MIT
+AJUDA INTEGRADA
+- Abra Ajuda na barra lateral, menu superior, ribbon, ou pressione F1.
+- Os cards do catálogo possuem "Entenda esta função" para abrir o tópico
+  correspondente no manual, dentro da área de trabalho do sistema.
+- A documentação já funciona offline e descreve propósitos, etapas e limites.
 
-Versao v0.1.6: Funcionalidades de consulta de itens. Nao eh uma validacao fiscal.
+OBSERVAÇÕES IMPORTANTES
+- Piloto da correção RN07: UF MG, leiaute 020, apuração simples, sem ajustes
+  complexos; outras situações são bloqueadas e exigem validação especializada.
+- O motor RN07 não altera automaticamente CFOP, XML, Questor ou TIPO_ITEM 0200.
+- A ferramenta complementar é apenas diagnóstica; base sem crédito ou item 0200
+  com classificação suspeita não representam, isoladamente, erro tributário.
+- Copiar para .SPED não torna o arquivo válido; o PVA pode aceitar .TXT.
+- Não substitui o PVA nem transmite ou assina arquivos.
+- Avalie sempre a legalidade da correção, condições de substituição e efeitos
+  em outros períodos de apuração. Não sobrescreva a escrituração original.
+
+ALTERAÇÕES: CHANGELOG.txt
+CÓDIGO-FONTE: pasta src/br/sig/sped
+ÍCONES: Tabler Icons (MIT), licença incluída no pacote.

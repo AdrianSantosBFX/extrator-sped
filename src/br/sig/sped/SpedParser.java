@@ -83,7 +83,7 @@ public final class SpedParser {
     }
     public static final class Resultado {
         public File arquivo;
-        public String codVer = "", nome = "", cnpj = "", uf = "", periodoInicio = "", periodoFim = "";
+        public String codVer = "", codFin = "", nome = "", cnpj = "", uf = "", periodoInicio = "", periodoFim = "";
         public String charset = "";
         public long linhasLidas;
         public int linhasIgnoradas;
@@ -119,7 +119,7 @@ public final class SpedParser {
     }
 
     public static Resultado ler(File arquivo) throws IOException {
-        if (arquivo == null || !arquivo.isFile()) throw new IOException("Arquivo TXT não encontrado.");
+        if (arquivo == null || !arquivo.isFile()) throw new IOException("Arquivo EFD/SPED não encontrado.");
         Charset charset = detectarCharset(arquivo.toPath());
         try {
             return lerComCharset(arquivo, charset);
@@ -155,6 +155,9 @@ public final class SpedParser {
                     resultado.tem0000 = true;
                     if (campos.length < 16) adicionar(resultado,n,reg,"Quantidade de campos menor que a esperada no registro 0000.");
                     resultado.codVer = campo(campos,2);
+                    resultado.codFin = campo(campos,3);
+                    if (!"0".equals(resultado.codFin) && !"1".equals(resultado.codFin))
+                        adicionar(resultado,n,reg,"COD_FIN deve ser 0 (original) ou 1 (substituta).");
                     resultado.periodoInicio = campo(campos,4);
                     resultado.periodoFim = campo(campos,5);
                     resultado.nome = campo(campos,6);

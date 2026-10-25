@@ -44,7 +44,7 @@ public final class SpedChromeTest {
                     for(int i=0;i<menu.getMenuCount();i++) if(name.equals(menu.getMenu(i).getText()))found=true;
                     check(found,"menu "+name);
                 }
-                for(String name:new String[]{"Abrir SPED (.txt)","Atualizar consulta","Exportar CSV","Ajuda"}) {
+                for(String name:new String[]{"Abrir SPED (.txt/.sped)","Atualizar consulta","Exportar CSV","Ajuda"}) {
                     JButton b=button(window.getContentPane(),name);
                     check(b!=null,"botao "+name);
                     check(b.getActionListeners().length>0,"acao vinculada "+name);
